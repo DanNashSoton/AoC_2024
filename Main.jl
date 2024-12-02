@@ -72,3 +72,5 @@ end
 
 @time day2_part1()
 @time day2_part2()
+
+# Day 3
