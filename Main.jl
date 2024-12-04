@@ -123,3 +123,69 @@ function day3_part2()
     answer = do_dont_multiply(raw)
     return print("Total multiply amount is $answer")
 end  
+
+@time day3_part1()
+@time day3_part2()
+
+# Day 4
+
+function search_string(line,word)
+    word_count = 0
+    p = 1
+    n = length(word)
+    starts = findall([x .== word[1] for x in line[1:end-n+1]])
+    for s in starts
+        if line[s:s+n-1] == word
+            word_count += 1
+        end
+    end
+    return word_count
+end
+
+function find_words(lines,word)
+    return sum([search_string(line,word) + search_string(reverse(line),word) for line in lines])
+end
+
+function turn_square(lines)
+    n = length(lines[1])
+    return [prod(getindex.(lines,m)) for m in 1:n]
+end
+
+function tilt_square(lines)
+    n = length(lines[1])
+    return [prod([lines[j][k-j+1] for j in min(n,k):-1:max(1,k-n+1)]) for k in 1:n*2-1]
+end
+    
+function day4_part1()
+    puzzle = readlines("Data\\Day4.txt")
+    all_squares = [puzzle,turn_square(puzzle),tilt_square(puzzle),tilt_square(reverse.(puzzle))]
+    total = sum(find_words.(all_squares,Ref("XMAS")))
+    return print("Total word count of $total")
+end
+
+function count_xmas(lines)
+    xmas_count = 0
+    n = length(lines)
+    for r in 2:n-1
+        mid_as = findall([x .== 'A' for x in lines[r][2:end-1]]) .+ 1
+        for s in mid_as
+            if all([lines[r-1][s-1] == 'M', # M.M
+                lines[r-1][s+1] == 'M',     # .A.
+                lines[r+1][s-1] == 'S',     # S.S
+                lines[r+1][s+1] == 'S'])
+                xmas_count += 1
+            end
+        end
+    end
+    return xmas_count
+end
+
+function day4_part2()
+    puzzle = readlines("Data\\Day4.txt")
+    all_squares = [puzzle,reverse(puzzle),turn_square(puzzle),reverse(turn_square(puzzle))]
+    total = sum(count_xmas.(all_squares))
+    return print("Total xmas count of $total")
+end
+
+@time day4_part1()
+@time day4_part2()
