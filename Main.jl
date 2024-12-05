@@ -131,7 +131,6 @@ end
 
 function search_string(line,word)
     word_count = 0
-    p = 1
     n = length(word)
     starts = findall([x .== word[1] for x in line[1:end-n+1]])
     for s in starts
@@ -189,3 +188,68 @@ end
 
 @time day4_part1()
 @time day4_part2()
+
+# Day 5
+
+function read_ordering(filepath)
+    raw = split(read(filepath,String),"\r\n\r\n")
+    rules = parse.(Int64,hcat(split.(readlines(IOBuffer(raw[1])),'|')...))
+    lists = [parse.(Int64,x) for x in split.(readlines(IOBuffer(raw[2])),',')]
+    return rules, lists
+end
+
+function find_valid_lists(rules,lists)
+    total = 0
+    valid_lists = []
+    fail_lists = []
+    for list in lists
+        n = length(list)
+        for p in 2:n
+            val =  list[p]
+            afters = rules[2,findall(rules[1,:] .== val)]
+            if any(in.(afters,[list[1:p-1]]))
+                push!(fail_lists,list)
+                break
+            elseif p == n
+                push!(valid_lists,list)
+
+            end
+        end
+    end
+    return valid_lists,fail_lists
+end
+
+function day5_part1()
+    rules, lists = read_ordering("Data\\Day5test.txt")
+    good,_ = find_valid_lists(rules,lists)
+    total = sum([x[Int((length(x)+1)/2)] for x in good])
+    return print("Total mid values add to $total")
+end
+
+function fix_order(list,rules)
+    n = length(list)
+    for p in 2:n
+        val =  list[p]
+        afters = rules[2,findall(rules[1,:] .== val)]
+        fails = in.(list[1:p-1],[afters])
+        if any(fails)
+            if all(fails)
+                list = vcat(val,list[1:p-1],list[p+1:end])
+            else
+                list = vcat(list[1:p-1][.!(fails)],val,list[1:p-1][fails],list[p+1:end])
+            end
+        end
+    end
+    return list
+end
+
+function day5_part2()
+    rules, lists = read_ordering("Data\\Day5.txt")
+    _, bad = find_valid_lists(rules,lists)
+    fixed = fix_order.(bad,Ref(rules))
+    total = sum([x[Int((length(x)+1)/2)] for x in fixed])
+    return print("Total fixed mid values add to $total")
+end
+
+@time day5_part1()
+@time day5_part2()
