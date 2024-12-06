@@ -212,7 +212,6 @@ function find_valid_lists(rules,lists)
                 break
             elseif p == n
                 push!(valid_lists,list)
-
             end
         end
     end
@@ -253,3 +252,97 @@ end
 
 @time day5_part1()
 @time day5_part2()
+
+# Day 6
+
+function read_map(filename)
+    raw = readlines(filename)
+    as_array = permutedims(hcat(collect.(raw)...))
+    return as_array
+end
+
+function next_position(guard)
+    pos = guard[1]
+    if guard[2] == 1
+        next_pos = [pos[1]-1,pos[2]]
+    elseif guard[2] == 2
+        next_pos = [pos[1],pos[2]+1]
+    elseif guard[2] == 3
+        next_pos = [pos[1]+1,pos[2]]
+    else
+        next_pos = [pos[1],pos[2]-1]
+    end
+    return next_pos
+end
+
+function left_map_test(map_array,pos)
+    n,m = size(map_array)
+    if any([minimum(pos) == 0, maximum(pos) == n+1])
+        return true
+    else
+        return false
+    end
+end
+
+function find_guard(map_array)
+    loc = findfirst(map_array .== '^')
+    return [loc[1],loc[2]]
+end
+
+function day6_part1()
+    map_array = read_map("Data\\Day6.txt")
+    loc1 = find_guard(map_array)
+    guard = [loc1,1] # 1 up 2 right 3 down 4 left, turning order
+    map_array[loc1[1],loc1[2]] = '.'
+    count = length(find_covered_places(guard,map_array))
+    return print("Total covered placed equals $count\n")
+end
+
+function find_covered_places(guard,map_array)
+    pos_history = []
+    while true
+        next_pos =  next_position(guard)
+        if left_map_test(map_array,next_pos)
+            break
+        elseif getindex(map_array,next_pos...) == '#'
+            guard = [guard[1],mod(guard[2],4)+1]
+        else
+            guard = [next_pos,guard[2]]
+            push!(pos_history,guard[1])
+        end
+    end
+    return unique(pos_history)
+end
+
+
+function loop_test(map_array,guard,obstruction)
+    new_map = copy(map_array)
+    new_map[obstruction[1],obstruction[2]] = '#'
+    pos_history = []
+    while true
+        next_pos = next_position(guard)
+        if in(guard,pos_history)
+            return 1
+        elseif left_map_test(new_map,next_pos)
+            return 0
+        elseif getindex(new_map,next_pos...) == '#'
+            guard = [guard[1],mod(guard[2],4)+1]
+        else
+            push!(pos_history,guard)
+            guard = [next_pos,guard[2]]
+        end
+    end
+end
+
+function day6_part2()
+    map_array = read_map("Data\\Day6.txt")
+    loc1 = find_guard(map_array)
+    guard = [loc1,1] # 1 up 2 right 3 down 4 left, turning order
+    possible_positions = find_covered_places(guard,map_array)
+    map_array[loc1[1],loc1[2]] = '.'
+    total = sum([loop_test(map_array,guard,obstruction) for obstruction in possible_positions])
+    return print("Total looping positions is $total\n")
+end
+
+@time day6_part1()
+@time day6_part2() # Took 1291 seconds (21.5 minutes) when testing
