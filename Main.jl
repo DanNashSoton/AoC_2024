@@ -346,3 +346,53 @@ end
 
 @time day6_part1()
 @time day6_part2() # Took 1291 seconds (21.5 minutes) when testing
+
+# Day 7
+
+function read_equations(filename)
+    raw_lines = split.(readlines(filename),": ")
+    targets = parse.(Int64,getindex.(raw_lines,1))
+    operator_lists = [parse.(Int64,split(x," ")) for x in getindex.(raw_lines,2)]
+    return targets, operator_lists
+end
+ 
+function f(x,y,num)
+    if num == 0
+        return x + y
+    elseif num == 1
+        return x * y
+    elseif num == 2
+        return parse(Int,prod(string.([x,y])))
+    end
+end
+
+function brute_force_test(target,operators,r)
+    n =  length(operators)-1
+    perms = digits.(0:r^n-1,base=r,pad=n)
+    for funcs in perms
+        val = operators[1]
+        for i in 1:n
+            val = f(val,operators[i+1],funcs[i])
+        end
+        if val == target
+            return true
+        end
+    end
+    return false
+end
+
+function day7_part1()
+    targets, operator_lists = read_equations("Data\\Day7.txt")
+    total = sum(targets[brute_force_test.(targets,operator_lists,2)])
+    return print("Calibration result is $total\n")
+end
+
+function day7_part2()
+    targets, operator_lists = read_equations("Data\\Day7.txt")
+    total = sum(targets[brute_force_test.(targets,operator_lists,3)])
+    return print("Calibration result is $total\n")
+end
+    
+    
+@time day7_part1()
+@time day7_part2()
