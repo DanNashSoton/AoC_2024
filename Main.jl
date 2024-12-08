@@ -373,6 +373,9 @@ function brute_force_test(target,operators,r)
         val = operators[1]
         for i in 1:n
             val = f(val,operators[i+1],funcs[i])
+            if val > target
+                break
+            end
         end
         if val == target
             return true
@@ -396,3 +399,76 @@ end
     
 @time day7_part1()
 @time day7_part2()
+
+# Day 8
+
+function in_map(antenna_map,p)
+    if 0 < p[1] <= size(antenna_map,1) && 0 < p[2] <= size(antenna_map,1)
+        return true
+    end
+    return false
+end
+
+function find_antinodes(antenna_map,signal)
+    loc = findall(antenna_map .== signal)
+    n = length(loc)
+    antinodes = []
+    for i in 1:n-1
+        for j in i+1:n
+            dif = loc[i] - loc[j]
+            p1 = loc[i] + dif
+            p2 = loc[j] - dif
+            [if in_map(antenna_map,p) push!(antinodes,p) end for p in [p1,p2]]
+        end
+    end
+    return antinodes
+end
+
+function day8_part1()
+    antenna_map = hcat(collect.(readlines("Data\\Day8.txt"))...)
+    signals = unique(antenna_map)[2:end]
+    total = length(unique(vcat(find_antinodes.(Ref(antenna_map),signals)...)))
+    return print("Number of valid antinodes is $total")
+end
+
+function find_pair_antinodes(antenna_map,p1,p2)
+    dif = p1 - p2
+    divisor = gcd(dif[1],dif[2])
+    if divisor > 1
+        dif = CartesianIndex(Int.([dif[1]/divisor,dif[2]/divisor])...)
+    end
+    locations = [p1]
+    p = p1 + dif
+    while in_map(antenna_map,p)
+        push!(locations,p)
+        p = p + dif
+    end
+    p = p1 - dif
+    while in_map(antenna_map,p)
+        push!(locations,p)
+        p = p - dif
+    end
+    return locations
+end
+
+function find_all_antinodes(antenna_map,signal)
+    loc = findall(antenna_map .== signal)
+    n = length(loc)
+    antinodes = []
+    for i in 1:n-1
+        for j in i+1:n
+            push!(antinodes,find_pair_antinodes(antenna_map,loc[i],loc[j]))
+        end
+    end
+    return unique(vcat(antinodes...))
+end
+
+function day8_part2()
+    antenna_map = hcat(collect.(readlines("Data\\Day8.txt"))...)
+    signals = unique(antenna_map)[2:end]
+    total = length(unique(vcat(find_all_antinodes.(Ref(antenna_map),signals)...)))
+    return print("Number of valid antinodes is $total")
+end
+
+@time day8_part1()
+@time day8_part2()
