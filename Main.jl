@@ -472,3 +472,103 @@ end
 
 @time day8_part1()
 @time day8_part2()
+
+# Day 9
+
+function create_disk(vals)
+    disk = ones(Int64,sum(vals)) .* -1
+    counter = 0
+    p = 1
+    is_group = true
+    for val in vals
+        if val > 0
+            if is_group
+                disk[p:p+val-1] .= counter
+                counter += 1
+            end
+            p += val
+        end
+        is_group = !(is_group)
+    end
+    return disk
+end
+
+function compact_file(disk)
+    n = count(disk .>= 0)
+    while length(disk) .> n
+        p = findfirst(disk .== -1)
+        x = pop!(disk)
+        while x .== -1
+            x = pop!(disk)
+        end
+        disk[p] = x
+    end
+    return disk
+end
+
+function day9_part1()
+    vals = parse.(Int,collect(read("Data\\Day9.txt",String)))
+    disk = create_disk(vals)
+    reduced = compact_file(disk)
+    checksum = sum(reduced .* collect(0:length(reduced)-1))
+    return print("Filesystem Checksum is $checksum")
+end
+
+function create_group_list(vals)
+    list = Vector{Vector{Int64}}(undef,length(vals))
+    counter = 0
+    p = 1
+    is_group = true
+    for val in vals
+        if is_group
+            list[p] = [counter for _ in 1:val]
+            counter += 1
+        else
+            list[p] = [-1 for _ in 1:val]
+        end
+        p += 1
+        is_group = !(is_group)
+    end
+    return list
+end
+
+function find_first_space(list,n)
+    for (i,x) in enumerate(list)
+        if count(x .== -1) >= n
+            return i
+        end
+    end
+    return 0
+end
+
+function compact_list(list)
+    actual_groups = findall(sum.(list) .> 0)
+    for i in reverse(actual_groups)
+        n = length(list[i])
+        x = find_first_space(list[1:i],n)
+        if x == 0
+            continue
+        else
+            if list[x][1] == -1
+                list[x][1:n] .= list[i]
+            else
+                p = findfirst(list[x] .== -1)
+                list[x][p:p+n-1] .= list[i]
+            end
+            list[i] = [-1 for _ in 1:n]
+        end
+    end
+    return vcat(list...)
+end
+
+function day9_part2()
+    vals = parse.(Int,collect(read("Data\\Day9.txt",String)))
+    list = create_group_list(vals)
+    compacted = compact_list(list)
+    checksum = sum(max.(0,compacted .* collect(0:length(compacted)-1)))
+    return print("Filesystem Checksum is $checksum")
+end
+
+
+@time day9_part1()
+@time day9_part2()
