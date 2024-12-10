@@ -572,3 +572,68 @@ end
 
 @time day9_part1()
 @time day9_part2()
+
+# Day 10
+
+function pad_map(topo_map)
+    n = size(topo_map,1)
+    padded = hcat(fill(-1,n),topo_map,fill(-1,n))
+    return vcat(fill(-1,1,n+2),padded,fill(-1,1,n+2))
+end
+
+function find_neighbours(padded_map,index)
+    positions =  Ref(index) .+ directions
+    valid = padded_map[positions] .== padded_map[index] + 1
+    return positions[valid]
+end
+
+function find_trailhead_score1(padded_map,index)
+    queue = find_neighbours(padded_map,index)
+    locations = []
+    while !(isempty(queue))
+        x = popfirst!(queue)
+        if padded_map[x] == 9
+            push!(locations,x)
+        else
+            queue = vcat(queue,find_neighbours(padded_map,x))
+        end
+    end
+    return length(unique(locations))
+end
+
+function find_trailhead_score2(padded_map,index)
+    queue = find_neighbours(padded_map,index)
+    score = 0
+    while !(isempty(queue))
+        x = popfirst!(queue)
+        if padded_map[x] == 9
+            score += 1
+        else
+            append!(queue,find_neighbours(padded_map,x))
+        end
+    end
+    return score
+end
+
+function day10_part1()
+    topo_map = parse.(Int64,hcat(collect.(readlines("Data\\Day10.txt"))...))
+    padded_map = pad_map(topo_map)
+    start_positions = findall(padded_map .== 0)
+    score = sum(find_trailhead_score1.(Ref(padded_map),start_positions))
+    return print("Total trailhead score is $score")
+end
+
+function day10_part2()
+    topo_map = parse.(Int64,hcat(collect.(readlines("Data\\Day10.txt"))...))
+    padded_map = pad_map(topo_map)
+    start_positions = findall(padded_map .== 0)
+    score = sum(find_trailhead_score2.(Ref(padded_map),start_positions))
+    return print("Total trailhead score is $score")
+end
+
+const directions = [CartesianIndex(-1,0),CartesianIndex(1,0),CartesianIndex(0,1),CartesianIndex(0,-1)]
+
+@time day10_part1()
+@time day10_part2()
+
+    
