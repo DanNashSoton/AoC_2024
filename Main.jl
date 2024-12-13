@@ -636,4 +636,282 @@ const directions = [CartesianIndex(-1,0),CartesianIndex(1,0),CartesianIndex(0,1)
 @time day10_part1()
 @time day10_part2()
 
-    
+# Day 11
+
+using Memoize
+
+function split_int(val)
+    n = Int(length(digits(val))/2)
+    return [Int(floor(val,sigdigits=n) / 10^n), mod(val,10^n)]
+end
+
+function build_indexes()
+    v1 = Vector{Int64}(undef,N)
+    v2 = Vector{Int64}(undef,N)
+    for i in 1:N
+        if iseven(length(digits(i)))
+            x = split_int(i)
+            v1[i] = x[2]
+            v2[i] = x[1]
+        else
+            v1[i] = i * 2024
+        end
+    end
+    return v1, v2
+end
+
+function too_big(val)
+    n = length(digits(val))
+    if iseven(n)
+        n2 = Int(n/2)
+        return [Int(floor(val,sigdigits=n2) / 10^n2), mod(val,10^n2)]
+    else
+        return [0,val * 2024,0]
+    end
+end
+
+function blink_faster(list)
+    x1 = zeros(Int,length(list))
+    x2 = zeros(Int,length(list))
+    for i in eachindex(list)
+        if list[i] == 0
+            x1[i] = 1
+        elseif list[i] <= N
+            x1[i] = v1[list[i]]
+            x2[i] = v2[list[i]]
+        else
+            x = too_big(list[i])
+            x1[i] = x[2]
+            x2[i] = x[1]
+        end
+    end
+    return vcat(x1,x2[x2 .> 0])
+end
+
+@memoize function n_blinks(list,n)
+    for _ in 1:n
+        list = blink_faster(list)
+    end
+    return list
+end
+
+const N = 10_000_000
+const v1,v2 = build_indexes()
+
+@memoize function jump_to_answer(val)
+    return length(vcat(n_blinks.(n_blinks(val,15),15)...))
+end
+
+function blink_list_n(list,p)
+    n = length(list)
+    out = Vector{Vector{Int64}}(undef,n)
+    for i in 1:n
+        out[i] = n_blinks(list[i],p)
+    end
+    return vcat(out...)
+end
+
+@memoize function jump_to_answer(val)
+    return length(n_blinks(val,25))
+end
+
+
+function sum_jumps(list)
+    counter = 0
+    for val in list
+        counter += jump_to_answer(val)
+    end
+    return counter
+end
+
+function day11_part1()
+    list = parse.(Int64,split(read("Data\\Day11.txt",String)))
+    answer = sum_jumps(list)
+    return print("Answer is $answer")
+end
+
+function day11_part2()
+    list = parse.(Int64,split(read("Data\\Day11.txt",String)))
+    for x in 1:2
+        list = blink_list_n(list,25)
+    end
+    answer = sum_jumps(list)
+    return print("Answer is $answer \n")
+end
+
+@time day11_part1()
+@time day11_part2()
+
+# Day 12
+
+function distance(c1,c2)
+    dif = c1 - c2
+    return abs(dif[1]) + abs(dif[2])
+end
+
+function calculate_perimeter(table,region)
+    points = zeros(Int,size(table))
+    points[region] .= 1
+    perim = 0
+    for p in findall(points .== 0)
+        perim += count(distance.(Ref(p),region) .== 1)
+    end
+    return perim
+end
+
+function find_price(table,start)
+    type = table[start]
+    all_possible = findall(table .== type)
+    region = [start]
+    n = 1
+    while true
+        distances = [minimum(distance.(Ref(x),region)) for x in all_possible]
+        region =  all_possible[distances .<= 1]
+        if length(region) == n
+            break
+        else
+            n = length(region)
+        end
+    end
+    perim = calculate_perimeter(table,region)
+    return n * perim, region
+end
+
+function pad_table(table)
+    a,b = size(table)
+    padded = vcat(fill('#',1,a+2),hcat(fill('#',a),table,fill('#',a)),fill('#',1,a+2))
+    visited = zeros(Int,a+2,b+2)
+    visited[1,:] .= 1
+    visited[end,:] .= 1
+    visited[:,1] .= 1
+    visited[:,end] .= 1
+    return padded, visited
+end
+
+function day12_part1()
+    table =  hcat(collect.(readlines("Data\\Day12.txt"))...)
+    visited = zeros(size(table))
+    table, visited = pad_table(table)
+    answer = 0
+    while in(0,visited)
+        start = findfirst(visited .== 0)
+        price,locations = find_price(table,start)
+        answer += price
+        visited[locations] .= 1
+    end
+    return print("Total price is $answer")
+end
+
+function count_corners(region,p)
+    counter = 0
+    for i in 1:4
+        corner = p + diag_directions[i]
+        side1 = p + side_directions[i]
+        side2 = p + side_directions[mod(i,4) + 1]
+        if in(side1,region) && in(side2,region) #Concave corner
+            counter += 1
+        elseif in(corner,region) && !in(side1,region) && !in(side2,region) #Convex Corner
+            counter += 1
+        end
+    end
+    return counter
+end
+
+function count_sides(table,region)
+    points = zeros(Int,size(table))
+    points[region] .= 1
+    sides = 0
+    non_region = findall(points .== 0)
+    relevant_only = non_region[[minimum(distance.(Ref(x),region)) for x in non_region] .<= 2]
+    for p in relevant_only
+        sides += count_corners(region,p)
+    end
+    return sides
+end
+
+function find_price_sides(table,start)
+    type = table[start]
+    all_possible = findall(table .== type)
+    region = [start]
+    n = 1
+    while true
+        distances = [minimum(distance.(Ref(x),region)) for x in all_possible]
+        region =  all_possible[distances .<= 1]
+        if length(region) == n
+            break
+        else
+            n = length(region)
+        end
+    end
+    sides = count_sides(table,region)
+    return n * sides, region
+end
+
+const diag_directions = [CartesianIndex(1,1),CartesianIndex(-1,1),CartesianIndex(-1,-1),CartesianIndex(1,-1)]
+const side_directions = [CartesianIndex(1,0),CartesianIndex(0,1),CartesianIndex(-1,0),CartesianIndex(0,-1)]
+
+function day12_part2()
+    table =  hcat(collect.(readlines("Data\\Day12.txt"))...)
+    table, visited = pad_table(table)
+    answer = 0
+    while in(0,visited)
+        start = findfirst(visited .== 0)
+        price,locations = find_price_sides(table,start)
+        answer += price
+        visited[locations] .= 1
+    end
+    return print("Total price is $answer")
+end
+
+@time day12_part1()
+@time day12_part2()
+
+# Day 13
+
+function find_numbers(button_string)
+    p1 = findfirst(isdigit.(collect(button_string)))
+    p2 = findfirst(.!isdigit.(collect(button_string[p1:end])))
+    x_dist = parse(Int64,button_string[p1:p1+p2-2])
+    y_dist = parse(Int64,button_string[p1+p2+3:end])
+    return [x_dist,y_dist]
+end
+
+function parse_q(raw_q)
+    parts = split(raw_q,"\r\n")
+    return hcat(find_numbers.(parts)...)
+end
+
+function adjust_q(q)
+    return hcat(q[:,1:2],q[:,3] .+ 10000000000000)
+end
+
+function matrix_det(A)
+    return A[4]*A[1] - A[2]*A[3]
+end
+
+function algorithmic_solve(q)
+    A = q[:,1:2]
+    b = q[:,3]
+    x1 = matrix_det(hcat(b,q[:,2]))/matrix_det(A)
+    x2 = matrix_det(hcat(q[:,1],b))/matrix_det(A)
+    if all(isinteger.([x1,x2]))
+        return Int(x1*3 + x2)
+    else
+        return 0
+    end
+end
+
+function day13_part1()
+    qs = [parse_q(x) for x in split.(read("Data\\Day13.txt",String),"\r\n\r\n")]
+    results = sum(algorithmic_solve.(qs))
+    return print("Fewest tokens needed is $results")
+end
+
+function day13_part2()
+    qs = [adjust_q(parse_q(x)) for x in split.(read("Data\\Day13.txt",String),"\r\n\r\n")]
+    results = sum(algorithmic_solve.(qs))
+    return print("Fewest tokens needed is $results")
+end
+
+@time day13_part1()
+@time day13_part2()
