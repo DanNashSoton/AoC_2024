@@ -889,7 +889,7 @@ function matrix_det(A)
     return A[4]*A[1] - A[2]*A[3]
 end
 
-function algorithmic_solve(q)
+function algorithmic_solve(q) # Cramer Formula 
     A = q[:,1:2]
     b = q[:,3]
     x1 = matrix_det(hcat(b,q[:,2]))/matrix_det(A)
@@ -915,3 +915,85 @@ end
 
 @time day13_part1()
 @time day13_part2()
+
+# Day 14
+
+function parse_robot(line)
+    return [parse(Int,line[x]) for x in findall(r"\d+|-\d+",line)]
+end
+
+function find_pos(robot,t,n,m)
+    x = mod(robot[1] + robot[3] * t,n)
+    y = mod(robot[2] + robot[4] * t,m)
+    return [x,y]
+end
+
+function count_quadrants(positions,n,m)
+    n_mid = (n-1)/2
+    m_mid = (m-1)/2
+    x_coords = getindex.(positions,1)
+    y_coords = getindex.(positions,2)
+    q1 = count((x_coords .< n_mid) .& (y_coords .< m_mid))
+    q2 = count((x_coords .< n_mid) .& (y_coords .> m_mid))
+    q3 = count((x_coords .> n_mid) .& (y_coords .< m_mid))
+    q4 = count((x_coords .> n_mid) .& (y_coords .> m_mid))
+    return prod([q1,q2,q3,q4])
+end
+
+function test_display(positions,n,m)
+    visual = zeros(m,n)
+    for p in positions
+        visual[p[2]+1,p[1]+1] += 1
+    end
+    return visual
+end
+
+function day14_part1()
+    robots = parse_robot.(readlines("Data\\Day14.txt"))
+    positions = find_pos.(robots,100,101,103)
+    answer = count_quadrants(positions,101,103)
+    return print("Product of Safety scores is $answer")
+end
+
+using PlotlyJS
+
+function produce_display(t)
+    robots = parse_robot.(readlines("Data\\Day14.txt"))
+    positions = find_pos.(robots,100,101,103)
+    return test_display2(positions,101,103)
+end
+
+function test_display2(positions,n,m)
+    visual = zeros(m,n)
+    for p in positions
+        visual[p[2]+1,p[1]+1] += 1
+    end
+    return plot(heatmap(x=1:n,y=1:m,z=visual))
+end
+
+#=
+
+Part 2 solved by sequentially looking at heatmaps of the results, 
+    spotting a recurring pattern, then looking at results in that pattern
+
+m = 103
+n = 101
+
+t = (1:1000 .* 103) .+ 63
+t_range = 63:103:10000
+
+for t in t_range
+    positions = find_pos.(robots,t,101,103)
+    display(test_display2(positions,n,m))
+    sleep(1)
+    print(t)
+    print("\n")
+end
+
+t = 6243
+positions = find_pos.(robots,t,101,103)
+display(test_display2(positions,n,m))
+
+Christmas tree is upside down, probably because of my heat_map function being iffy
+
+=#
