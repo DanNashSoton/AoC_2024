@@ -968,18 +968,27 @@ function test_display2(positions,n,m)
     for p in positions
         visual[p[2]+1,p[1]+1] += 1
     end
-    return plot(heatmap(x=1:n,y=1:m,z=visual))
+    return plot(heatmap(x=n:-1:1,y=m:-1:1,z=visual))
 end
 
 #=
 
+robots = parse_robot.(readlines("Data\\Day14.txt"))
+
 Part 2 solved by sequentially looking at heatmaps of the results, 
     spotting a recurring pattern, then looking at results in that pattern
+
+for t in 1:1000
+    positions = find_pos.(robots,t,101,103)
+    display(test_display2(positions,101,103))
+    sleep(1)
+    print(t)
+    print("\n")
+end
 
 m = 103
 n = 101
 
-t = (1:1000 .* 103) .+ 63
 t_range = 63:103:10000
 
 for t in t_range
@@ -992,8 +1001,230 @@ end
 
 t = 6243
 positions = find_pos.(robots,t,101,103)
-display(test_display2(positions,n,m))
-
-Christmas tree is upside down, probably because of my heat_map function being iffy
+test_display(positions,101,103)
+display(test_display2(positions,101,103))
 
 =#
+
+# Day 15
+
+function read_map_and_instructions(filename)
+    raw_bits =  split(read(filename,String),"\r\n\r\n")
+    grid = permutedims(hcat(collect.(readlines(IOBuffer(raw_bits[1])))...))
+    instructions = prod(readlines(IOBuffer(raw_bits[2])))
+    return grid, parse_instructions(instructions)
+end
+
+function parse_instructions(instructions)
+    return [findfirst(['^','>','v','<'] .== x) for x in instructions]
+end
+
+function find_line(grid,current,instruct)
+    boxes = [current + moves[instruct]]
+    while grid[last(boxes) + moves[instruct]] == 'O'
+        push!(boxes,last(boxes) + moves[instruct])
+    end
+    return vcat(current,boxes)
+end
+
+function apply_move(grid,instruct)
+    current = findfirst(grid .== '@')
+    next =  current + moves[instruct]
+    if grid[next] == '.'
+        grid[next] = '@'
+        grid[current] = '.'
+    elseif grid[next] == 'O'
+        all_boxes = find_line(grid,current,instruct)
+        if grid[last(all_boxes) + moves[instruct]] == '.'
+            grid[all_boxes .+ Ref(moves[instruct])] = grid[all_boxes]
+            grid[current] = '.'
+        end
+    end
+    return grid
+end
+
+function calculate_location(box)
+    return (box[1] - 1) * 100 + box[2] - 1
+end
+
+function enlarge_map(grid)
+    char_swapped = [swap_grid[:,2][findfirst(x .== swap_grid[:,1])] for x in grid]
+    return permutedims(hcat(collect.(prod(char_swapped,dims=2))...))
+end
+
+function find_box(grid,p)
+    if grid[p] == '['
+        return [p,p + CartesianIndex(0,1)]
+    else
+        return [p + CartesianIndex(0,-1),p]
+    end
+end
+
+function find_moveable_boxes(grid,current,instruct)
+    move = moves[instruct]
+    next = current + move
+    moveable_boxes = []
+    box_queue = [find_box(grid,next)]
+    while !isempty(box_queue)
+        box = popfirst!(box_queue)
+        if instruct == 2
+            to_check = [box[2] + move]
+        elseif instruct == 4
+            to_check = [box[1] + move]
+        else
+            to_check = box .+ Ref(move)
+        end
+        for p in to_check
+            if grid[p] == '#'
+                return []
+            elseif in(grid[p],['[',']'])
+                push!(box_queue,find_box(grid,p))
+            end
+            push!(moveable_boxes,box)
+        end
+    end
+    return moveable_boxes
+end
+
+function apply_move2(grid,instruct)
+    current = findfirst(grid .== '@')
+    move = moves[instruct]
+    next =  current + move
+    if grid[next] == '.'
+        grid[next] = '@'
+        grid[current] = '.'
+    elseif in(grid[next],['[',']'])
+        moveable_boxes = find_moveable_boxes(grid,current,instruct)
+        if !isempty(moveable_boxes)
+            for box in moveable_boxes
+                grid[box[1]] = '.'
+                grid[box[2]] = '.'
+            end
+            for box in moveable_boxes
+                grid[box[1]+move] = '['
+                grid[box[2]+move] = ']'
+            end
+            grid[next] = '@'
+            grid[current] = '.'
+        end
+    end
+    return grid
+end
+
+const moves = [CartesianIndex(-1,0),CartesianIndex(0,1),CartesianIndex(1,0),CartesianIndex(0,-1)] # ^ > v <
+const swap_grid = ['#' "##" ; '@' "@." ; '.' ".." ; 'O' "[]"]
+
+function day15_part1()
+    grid, instructions = read_map_and_instructions("Data\\Day15.txt")
+    # grid, instructions = read_map_and_instructions("Data\\Day15test.txt")
+    for instruct in instructions
+        grid = apply_move(grid,instruct)
+    end
+    all_boxes = findall(grid .== 'O')
+    answer = sum(calculate_location.(all_boxes))
+    return print("Final position of boxes is $answer")
+end
+
+function day15_part2()
+    grid, instructions = read_map_and_instructions("Data\\Day15.txt")
+    # grid, instructions = read_map_and_instructions("Data\\Day15test.txt")
+    grid = enlarge_map(grid)
+    for instruct in instructions
+        grid = apply_move2(grid,instruct)
+    end
+    all_boxes = findall(grid .== '[')
+    answer = sum(calculate_location.(all_boxes))
+    return print("Final position of boxes is $answer")
+end
+
+@time day15_part1()
+@time day15_part2()
+
+# Day 16
+
+function solve_maze_with_memory(maze)
+    start_position = findfirst(maze .== 'S')
+    position_queue = PriorityQueue([[CartesianIndex(0,0),start_position],2] => 0)
+    memory_queue = PriorityQueue([[CartesianIndex(0,0),start_position],2] => 0)
+    while true
+        current = dequeue_pair!(position_queue)
+        pos = current[1]
+        loc = pos[1][2]
+        cost = current[2]
+        for dir in mod1.(collect(pos[2]-1:pos[2]+1),4)
+            next_pos = loc + moves[dir]
+            !in(maze[next_pos],['.','E']) && continue
+            if dir == pos[2]
+                next_cost = cost + 1
+            else
+                next_cost = cost + 1000
+                next_pos = loc
+            end
+            next_pos == pos[1][1] && continue
+            maze[next_pos] == 'E' && return next_cost, memory_queue
+            history = [loc,next_pos]
+            if haskey(position_queue,[history,dir])
+                position_queue[[history,dir]] = min(position_queue[[history,dir]],next_cost)
+            else
+                enqueue!(position_queue,[history,dir],next_cost)
+            end
+            if haskey(memory_queue,[history,dir])
+                memory_queue[[history,dir]] = min(memory_queue[[history,dir]],next_cost)
+            else
+                enqueue!(memory_queue,[history,dir],next_cost)
+            end  
+        end
+    end
+end
+
+function arrange_memory(memory_queue)
+    rearranged = Array{Any}(undef,length(memory_queue),4)
+    for i in 1:length(memory_queue)
+        data = dequeue_pair!(memory_queue)
+        rearranged[i,:]= [data[1][1][1] data[1][1][2] data[1][2] data[2]]
+    end
+    return rearranged
+end
+
+function find_predecssors(memory_array,current_id)
+    current = memory_array[current_id,:]
+    at_previous = findall(memory_array[:,2] .== Ref(current[1]))
+    direction_difs = abs.(memory_array[at_previous,3] .- current[3])
+    required_costs = current[4] .- 1000 .^ min.(direction_difs,4 .- direction_difs)
+    return at_previous[memory_array[at_previous,4] .== required_costs]
+end
+
+function parse_memory(maze,memory_array)
+    finish = findfirst(maze .== 'E')
+    next = memory_array[:,2] .+ moves[memory_array[:,3]]
+    queue = findall(next .== Ref(finish))
+    maze_tracker = copy(maze)
+    [maze_tracker[p] = 'O' for p in vcat(finish,memory_array[queue,2])]
+    while length(queue) > 0
+        current_id = popfirst!(queue)
+        prior_ids = find_predecssors(memory_array,current_id)
+        [maze_tracker[p] = 'O' for p in memory_array[prior_ids,2]]
+        append!(queue,prior_ids)
+    end
+    return sum(length(findall(maze_tracker .== 'O')))
+end
+
+using DataStructures
+const moves = [CartesianIndex(-1,0),CartesianIndex(0,1),CartesianIndex(1,0),CartesianIndex(0,-1)]
+
+function day16_part1()
+    maze = permutedims(hcat(collect.(readlines("Data\\Day16.txt"))...))
+    answer, _ = solve_maze_with_memory(maze)
+    return print("Lowest cost is $answer")
+end
+
+function day16_part2()
+    maze = permutedims(hcat(collect.(readlines("Data\\Day16.txt"))...))
+    _, memory_queue = solve_maze_with_memory(maze)
+    memory_array = arrange_memory(memory_queue)
+    answer = parse_memory(maze,memory_array)
+    return print("Number of tiles is $answer")
+end
+
+@time day16_part1()
+@time day16_part2()
